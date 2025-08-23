@@ -50,44 +50,37 @@ module.exports = (sequelize) => {
       allowNull: true,
       field: 'unitPrice',
       validate: {
-        min: {
-          args: 0,
-          msg: 'Unit price must be non-negative'
-        }
+        min: 0
       }
     },
     unitsInStock: {
-      type: DataTypes.SMALLINT,
+      type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
       field: 'unitsInStock',
       validate: {
-        min: {
-          args: 0,
-          msg: 'Units in stock must be non-negative'
-        }
+        min: 0
       }
     },
     unitsOnOrder: {
-      type: DataTypes.SMALLINT,
+      type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
       field: 'unitsOnOrder',
       validate: {
-        min: {
-          args: 0,
-          msg: 'Units on order must be non-negative'
-        }
+        min: 0
       }
     },
     reorderLevel: {
-      type: DataTypes.SMALLINT,
+      type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
       field: 'reorderLevel',
       validate: {
-        min: {
-          args: 0,
-          msg: 'Reorder level must be non-negative'
-        }
+        min: 0
       }
+    },
+    isDeleted: {
+      type: DataTypes.TINYINT,
+      defaultValue: 0,
+      allowNull: false
     },
     discontinued: {
       type: DataTypes.BOOLEAN,

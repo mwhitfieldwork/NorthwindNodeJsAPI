@@ -24,7 +24,7 @@ const territoryRoutes = require('./routes/territories');
 const regionRoutes = require('./routes/regions');*/
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3002;
 
 // Security middleware
 app.use(helmet());

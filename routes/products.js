@@ -6,12 +6,15 @@ const router = express.Router();
 
 // Validation middleware
 const handleValidationErrors = (req, res, next) => {
+  console.log("Validation middleware hit");
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    console.log("Validation errors found:", errors.array());
     return res.status(400).json({
       success: false,
       error: {
-        message: 'Validation failed',
+        message: 'Validation Error: Unit price must be non-negative, Units in stock must be non-negative, Units on order must be non-negative, Reorder level must be non-negative',
+        statusCode: 400,
         errors: errors.array()
       }
     });
@@ -550,12 +553,14 @@ router.post('/', [
   body('supplierId').optional().isInt({ min: 1 }),
   body('categoryId').optional().isInt({ min: 1 }),
   body('quantityPerUnit').optional().isString(),
-  body('unitPrice').optional().isFloat({ min: 0 }),
-  body('unitsInStock').optional().isInt({ min: 0 }),
-  body('unitsOnOrder').optional().isInt({ min: 0 }),
-  body('reorderLevel').optional().isInt({ min: 0 }),
+  body('unitPrice').optional().isFloat().custom(value => value >= 0),
+  body('unitsInStock').optional().isInt().custom(value => value >= 0),
+  body('unitsOnOrder').optional().isInt().custom(value => value >= 0),
+  body('reorderLevel').optional().isInt().custom(value => value >= 0),
   body('discontinued').optional().isBoolean()
 ], handleValidationErrors, async (req, res, next) => {
+  console.log("Listen Mike: POST route hit"); // ADD THIS LINE HERE
+  console.log("WMRequest body:", req.body); // ADD THIS TOO to see what data is being received
   const transaction = await sequelize.transaction();
   
   try {
@@ -695,10 +700,10 @@ router.put('/:id', [
   body('supplierId').optional().isInt({ min: 1 }),
   body('categoryId').optional().isInt({ min: 1 }),
   body('quantityPerUnit').optional().isString(),
-  body('unitPrice').optional().isFloat({ min: 0 }),
-  body('unitsInStock').optional().isInt({ min: 0 }),
-  body('unitsOnOrder').optional().isInt({ min: 0 }),
-  body('reorderLevel').optional().isInt({ min: 0 }),
+  body('unitPrice').optional().isFloat().custom(value => value >= 0),
+  body('unitsInStock').optional().isInt().custom(value => value >= 0),
+  body('unitsOnOrder').optional().isInt().custom(value => value >= 0),
+  body('reorderLevel').optional().isInt().custom(value => value >= 0),
   body('discontinued').optional().isBoolean()
 ], handleValidationErrors, async (req, res, next) => {
   const transaction = await sequelize.transaction();
@@ -823,6 +828,8 @@ router.put('/:id', [
  *       400:
  *         description: Cannot delete product with order history
  */
+
+
 router.delete('/:id', [
   param('id').isInt({ min: 1 }),
   query('force').optional().isBoolean()
@@ -833,7 +840,7 @@ router.delete('/:id', [
     const { id } = req.params;
     const force = req.query.force === 'true';
     
-    // Check if product exists
+    // Get the product (equivalent to GetAsync in MVC)
     const product = await models.Product.findByPk(id, { transaction });
     if (!product) {
       await transaction.rollback();
@@ -846,45 +853,48 @@ router.delete('/:id', [
       });
     }
     
-    // Check if product has order history
-    const orderDetailCount = await models.OrderDetail.count({
-      where: { productId: id },
-      transaction
-    });
-    
-    if (orderDetailCount > 0 && !force) {
+    // Check if already soft deleted
+    if (product.isDeleted === 1) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
         error: {
-          message: `Cannot delete product with ${orderDetailCount} order records. Use force=true to override or consider marking as discontinued.`,
+          message: 'Product is already deleted',
           statusCode: 400
         }
       });
     }
     
-    if (force && orderDetailCount > 0) {
-      // In a real system, you might archive these records instead
-      await models.OrderDetail.destroy({
-        where: { productId: id },
-        transaction
-      });
-    }
+    // Note: Since this is a soft delete, we don't need to check order history
+    // The product record remains in the database, preserving referential integrity
     
-    // Delete product
-    await models.Product.destroy({
-      where: { productId: id },
-      transaction
-    });
+    // Soft delete: Set isDeleted to 1 (equivalent to TrySetProperty in MVC)
+    console.log('Before update - isDeleted:', product.isDeleted);
     
+    const updateResult = await product.update(
+      { 
+        isDeleted: 1, // Use 1 instead of true for database compatibility
+        deletedAt: new Date() // Optional: track when it was deleted
+      }, 
+      { transaction }
+    );
+    
+    console.log('Update result:', updateResult);
+    console.log('After update - isDeleted:', product.isDeleted);
+    
+    // Reload to verify the update
+    await product.reload({ transaction });
+    console.log('After reload - isDeleted:', product.isDeleted);
+    
+    // Equivalent to _dc.SaveChanges() - commit the transaction
     await transaction.commit();
     
     res.json({
       success: true,
-      message: 'Product deleted successfully',
+      message: 'Product soft deleted successfully',
       data: {
         deletedProductId: id,
-        affectedOrderDetails: orderDetailCount
+        deletedAt: new Date()
       }
     });
   } catch (error) {
