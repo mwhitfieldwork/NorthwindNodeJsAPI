@@ -40,6 +40,7 @@ const Territory = require('../models/Territory');
 const Region = require('../models/Region');
 const CustomerDemographics = require('../models/CustomerDemographics');
 const EmployeeTerritory = require('../models/EmployeeTerritory');
+const User = require('../models/User'); // ADD THIS LINE
 
 // Initialize models
 const models = {
@@ -55,6 +56,7 @@ const models = {
   Region: Region(sequelize),
   CustomerDemographics: CustomerDemographics(sequelize),
   EmployeeTerritory: EmployeeTerritory(sequelize),
+  User: User(sequelize), 
 };
 
 // Define associations
