@@ -352,6 +352,171 @@ router.get('/', [
 
 /**
  * @swagger
+ * /orders/history:
+ *   get:
+ *     summary: Get order history (flattened order details with product info)
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 25
+ *     responses:
+ *       200:
+ *         description: Order history with flattened details
+ */
+router.get('/history', [
+  query('limit').optional().isInt({ min: 1, max: 100 })
+], handleValidationErrors, async (req, res, next) => {
+  try {
+    const limit = parseInt(req.query.limit) || 25;
+    
+    const orderHistory = await models.OrderDetail.findAll({
+      attributes: [
+        'orderId',
+        'productId', 
+        'unitPrice',
+        'quantity',
+        'discount'
+      ],
+      include: [{
+        model: models.Product,
+        as: 'product',
+        attributes: ['productName']
+      }],
+      limit,
+      order: [['orderId', 'DESC']]
+    });
+    
+    // Flatten the results to match your MVC structure
+    const flattenedResults = orderHistory.map(detail => ({
+      orderId: detail.orderId,
+      productId: detail.productId,
+      unitPrice: detail.unitPrice,
+      quantity: detail.quantity,
+      discount: detail.discount,
+      productName: detail.product.productName
+    }));
+    
+    res.json({
+      success: true,
+      data: flattenedResults
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /orders/statistics:
+ *   get:
+ *     summary: Get order statistics
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: query
+ *         name: fromDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: toDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Order statistics
+ */
+router.get('/statistics', [
+  query('fromDate').optional().isISO8601(),
+  query('toDate').optional().isISO8601()
+], handleValidationErrors, async (req, res, next) => {
+  try {
+    const fromDate = req.query.fromDate;
+    const toDate = req.query.toDate;
+    
+    let where = {};
+    if (fromDate || toDate) {
+      where.orderDate = {};
+      if (fromDate) where.orderDate[Op.gte] = new Date(fromDate);
+      if (toDate) where.orderDate[Op.lte] = new Date(toDate);
+    }
+    
+    const [
+      totalOrders,
+      pendingOrders,
+      processingOrders,
+      shippedOrders,
+      overdueOrders,
+      totalRevenue
+    ] = await Promise.all([
+      models.Order.count({ where }),
+      models.Order.count({ where: { ...where, orderDate: null } }),
+      models.Order.count({ 
+        where: { 
+          ...where, 
+          [Op.and]: [
+            { orderDate: { [Op.ne]: null } },
+            { shippedDate: null }
+          ]
+        }
+      }),
+      models.Order.count({ where: { ...where, shippedDate: { [Op.ne]: null } } }),
+      models.Order.count({ 
+        where: { 
+          ...where,
+          [Op.and]: [
+            { shippedDate: null },
+            { requiredDate: { [Op.lt]: new Date() } }
+          ]
+        }
+      }),
+      models.Order.sum('freight', { where })
+    ]);
+    
+    // Get top customers
+    const topCustomers = await models.Order.findAll({
+      where,
+      attributes: [
+        'custId',
+        [sequelize.fn('COUNT', sequelize.col('orderId')), 'orderCount'],
+        [sequelize.fn('SUM', sequelize.col('freight')), 'totalFreight']
+      ],
+      include: [{
+        model: models.Customer,
+        as: 'customer',
+        attributes: ['companyName']
+      }],
+      group: ['custId', 'customer.custId'],
+      order: [[sequelize.literal('orderCount'), 'DESC']],
+      limit: 5
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        totalOrders,
+        ordersByStatus: {
+          pending: pendingOrders,
+          processing: processingOrders,
+          shipped: shippedOrders,
+          overdue: overdueOrders
+        },
+        totalRevenue: totalRevenue || 0,
+        topCustomers
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
  * /orders/{id}:
  *   get:
  *     summary: Get order by ID
@@ -1063,111 +1228,6 @@ router.patch('/:id/ship', [
       success: true,
       data: updatedOrder,
       message: 'Order shipped successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * @swagger
- * /orders/statistics:
- *   get:
- *     summary: Get order statistics
- *     tags: [Orders]
- *     parameters:
- *       - in: query
- *         name: fromDate
- *         schema:
- *           type: string
- *           format: date
- *       - in: query
- *         name: toDate
- *         schema:
- *           type: string
- *           format: date
- *     responses:
- *       200:
- *         description: Order statistics
- */
-router.get('/statistics', [
-  query('fromDate').optional().isISO8601(),
-  query('toDate').optional().isISO8601()
-], handleValidationErrors, async (req, res, next) => {
-  try {
-    const fromDate = req.query.fromDate;
-    const toDate = req.query.toDate;
-    
-    let where = {};
-    if (fromDate || toDate) {
-      where.orderDate = {};
-      if (fromDate) where.orderDate[Op.gte] = new Date(fromDate);
-      if (toDate) where.orderDate[Op.lte] = new Date(toDate);
-    }
-    
-    const [
-      totalOrders,
-      pendingOrders,
-      processingOrders,
-      shippedOrders,
-      overdueOrders,
-      totalRevenue
-    ] = await Promise.all([
-      models.Order.count({ where }),
-      models.Order.count({ where: { ...where, orderDate: null } }),
-      models.Order.count({ 
-        where: { 
-          ...where, 
-          [Op.and]: [
-            { orderDate: { [Op.ne]: null } },
-            { shippedDate: null }
-          ]
-        }
-      }),
-      models.Order.count({ where: { ...where, shippedDate: { [Op.ne]: null } } }),
-      models.Order.count({ 
-        where: { 
-          ...where,
-          [Op.and]: [
-            { shippedDate: null },
-            { requiredDate: { [Op.lt]: new Date() } }
-          ]
-        }
-      }),
-      models.Order.sum('freight', { where })
-    ]);
-    
-    // Get top customers
-    const topCustomers = await models.Order.findAll({
-      where,
-      attributes: [
-        'custId',
-        [sequelize.fn('COUNT', sequelize.col('orderId')), 'orderCount'],
-        [sequelize.fn('SUM', sequelize.col('freight')), 'totalFreight']
-      ],
-      include: [{
-        model: models.Customer,
-        as: 'customer',
-        attributes: ['companyName']
-      }],
-      group: ['custId', 'customer.custId'],
-      order: [[sequelize.literal('orderCount'), 'DESC']],
-      limit: 5
-    });
-    
-    res.json({
-      success: true,
-      data: {
-        totalOrders,
-        ordersByStatus: {
-          pending: pendingOrders,
-          processing: processingOrders,
-          shipped: shippedOrders,
-          overdue: overdueOrders
-        },
-        totalRevenue: totalRevenue || 0,
-        topCustomers
-      }
     });
   } catch (error) {
     next(error);
