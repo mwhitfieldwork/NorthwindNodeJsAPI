@@ -19,6 +19,7 @@ const employeeRoutes = require('./routes/employees');
 const orderRoutes = require('./routes/orders');
 const productRoutes = require('./routes/products');
 const supplierRoutes = require('./routes/suppliers');
+const loginRoutes = require('./routes/login');
 /*const shipperRoutes = require('./routes/shippers');
 const territoryRoutes = require('./routes/territories');
 const regionRoutes = require('./routes/regions');*/
@@ -126,15 +127,20 @@ app.get('/health', (req, res) => {
 // API routes
 const apiBase = process.env.API_BASE_URL || '/api/v1';
 
+console.log('📍 API Base URL:', apiBase); 
+
 app.use(`${apiBase}/categories`, categoryRoutes);
 app.use(`${apiBase}/customers`, customerRoutes);
 app.use(`${apiBase}/employees`, employeeRoutes);
 app.use(`${apiBase}/orders`, orderRoutes);
 app.use(`${apiBase}/products`, productRoutes);
 app.use(`${apiBase}/suppliers`, supplierRoutes);
+app.use(`${apiBase}/login`, loginRoutes);
 /*app.use(`${apiBase}/shippers`, shipperRoutes);
 app.use(`${apiBase}/territories`, territoryRoutes);
 app.use(`${apiBase}/regions`, regionRoutes);*/
+
+console.log('✅ Login routes mounted at:', `${apiBase}/login`);
 
 // 404 handler
 app.use('*', (req, res) => {
