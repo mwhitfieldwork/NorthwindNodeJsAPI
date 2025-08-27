@@ -505,7 +505,7 @@ router.post('/logout', authenticateToken, logout);
 
 /**
  * @swagger
- * /api/v1/login/me:
+ /login/me:
  *   get:
  *     summary: Get current user info
  *     description: Get the authenticated user's information
@@ -541,6 +541,7 @@ router.post('/logout', authenticateToken, logout);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
+console.log('What is the AUTHENTICATIOn', authenticateToken);
 router.get('/me', authenticateToken, getMe);
 
 /**
