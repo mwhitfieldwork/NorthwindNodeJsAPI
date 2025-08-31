@@ -275,7 +275,7 @@ router.get('/', [
     }
     if (includeOrders) {
       include.push({
-        model: models.Order,
+        model: models.SalesOrder,
         as: 'orders',
         attributes: ['orderId', 'orderDate', 'shippedDate', 'freight'],
         limit: 10, // Limit orders to prevent excessive data
@@ -388,7 +388,7 @@ router.get('/:id', [
     }
     if (includeOrders) {
       include.push({
-        model: models.Order,
+        model: models.SalesOrder,
         as: 'orders',
         include: [{
           model: models.Customer,
@@ -752,7 +752,7 @@ router.delete('/:id', [
     const { id } = req.params;
     
     // Check if employee has orders
-    const orderCount = await models.Order.count({
+    const orderCount = await models.SalesOrder.count({
       where: { employeeId: id }
     });
     
@@ -907,7 +907,7 @@ router.get('/:id/orders', [
       }
     }
     
-    const { count, rows } = await models.Order.findAndCountAll({
+    const { count, rows } = await models.SalesOrder.findAndCountAll({
       where,
       include: [{
         model: models.Customer,

@@ -78,11 +78,11 @@ module.exports = (sequelize) => {
   });
 
   OrderDetail.associate = (models) => {
-    OrderDetail.belongsTo(models.Order, {
+    OrderDetail.belongsTo(models.SalesOrder, { // ✅ updated from models.SalesOrder
       foreignKey: 'orderId',
-      as: 'order'
+      as: 'order' // 👈 keep this alias consistent with your query
     });
-    
+  
     OrderDetail.belongsTo(models.Product, {
       foreignKey: 'productId',
       as: 'product'

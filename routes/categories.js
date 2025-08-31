@@ -862,73 +862,69 @@ router.get('/:categoryName/sales/:year', [
 ], handleValidationErrors, async (req, res, next) => {
   try {
     const { categoryName, year } = req.params;
-    
-    // Check if category exists
-    const category = await models.Category.findOne({
-      where: { categoryName: { [Op.iLike]: categoryName } }
-    });
-    
-    if (!category) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Category not found',
-          statusCode: 404
-        }
-      });
-    }
 
-    // Get sales data for the category and year
-    // This mimics the stored procedure logic from .NET
+    const startDate = `${year}-01-01`;
+    const endDate = `${year}-12-31`;
+
     const salesData = await models.OrderDetail.findAll({
       attributes: [
         [sequelize.col('product.productName'), 'productName'],
-        [sequelize.fn('SUM', sequelize.literal('OrderDetail.unitPrice * OrderDetail.quantity * (1 - OrderDetail.discount)')), 'totalPurchase']
+        [
+          sequelize.fn(
+            'ROUND',
+            sequelize.fn(
+              'SUM',
+              sequelize.literal('OrderDetail.unitPrice * OrderDetail.quantity * (1 - OrderDetail.discount)')
+            ),
+            0
+          ),
+          'totalPurchase'
+        ]
       ],
       include: [
         {
           model: models.Product,
           as: 'product',
           attributes: [],
-          include: [{
-            model: models.Category,
-            as: 'category',
-            attributes: [],
-            where: { categoryName: { [Op.iLike]: categoryName } }
-          }]
+          include: [
+            {
+              model: models.Category,
+              as: 'category',
+              attributes: [],
+              where: {
+                categoryName: categoryName
+              }
+            }
+          ]
         },
         {
-          model: models.Order,
+          model: models.SalesOrder,
           as: 'order',
           attributes: [],
-          where: sequelize.where(
-            sequelize.fn('YEAR', sequelize.col('order.orderDate')),
-            year
-          )
+          where: {
+            orderDate: {
+              [Op.between]: [startDate, endDate]
+            }
+          }
         }
       ],
-      group: ['product.productId', 'product.productName'],
-      order: [[sequelize.literal('totalPurchase'), 'DESC']],
+      group: ['product.productName'],
+      order: [sequelize.literal('productName ASC')],
       raw: true
     });
 
-    // Format the response to match .NET DTO structure
-    const formattedSalesData = salesData.map(item => ({
-      productName: item.productName,
-      totalPurchase: parseFloat(item.totalPurchase || 0).toFixed(2)
+    const formattedData = salesData.map(item => ({
+      ProductName: item.productName,
+      TotalPurchase: parseFloat(item.totalPurchase || 0).toFixed(2)
     }));
 
     res.json({
       success: true,
-      data: formattedSalesData,
-      meta: {
-        categoryName,
-        year,
-        totalProducts: formattedSalesData.length,
-        totalSales: formattedSalesData.reduce((sum, item) => sum + parseFloat(item.totalPurchase), 0).toFixed(2)
-      }
+      data: formattedData
     });
+
   } catch (error) {
+    console.error('[SalesByCategory Error]', error);
     next(error);
   }
 });
