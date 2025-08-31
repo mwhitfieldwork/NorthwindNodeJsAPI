@@ -102,7 +102,7 @@ module.exports = (sequelize) => {
   });
 
   Customer.associate = (models) => {
-    Customer.hasMany(models.Order, {
+    Customer.hasMany(models.SalesOrder, {
       foreignKey: 'custId',
       as: 'orders'
     });

@@ -416,7 +416,7 @@ router.get('/:id', [
         model: models.OrderDetail,
         as: 'orderDetails',
         include: [{
-          model: models.Order,
+          model: models.SalesOrder,
           as: 'order',
           attributes: ['orderId', 'orderDate', 'custId'],
           include: [{
