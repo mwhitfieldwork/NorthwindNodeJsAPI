@@ -31,7 +31,7 @@ const sequelize = new Sequelize({
 const Category = require('../models/Category');
 const Customer = require('../models/Customer');
 const Employee = require('../models/Employee');
-const Order = require('../models/Order');
+const SalesOrder  = require('../models/Order');
 const OrderDetail = require('../models/OrderDetail');
 const Product = require('../models/Product');
 const Supplier = require('../models/Supplier');
@@ -41,13 +41,18 @@ const Region = require('../models/Region');
 const CustomerDemographics = require('../models/CustomerDemographics');
 const EmployeeTerritory = require('../models/EmployeeTerritory');
 const User = require('../models/User'); // ADD THIS LINE
+const CustomerModel = require('../models/Customer');
+const SalesOrderModel = require('../models/Order');
+
 
 // Initialize models
 const models = {
   Category: Category(sequelize),
-  Customer: Customer(sequelize),
+  //Customer: Customer(sequelize),
+  Customer: CustomerModel(sequelize, Sequelize.DataTypes),
   Employee: Employee(sequelize),
-  Order: Order(sequelize),
+  //SalesOrder: SalesOrder(sequelize),
+  SalesOrder: SalesOrderModel(sequelize, Sequelize.DataTypes),
   OrderDetail: OrderDetail(sequelize),
   Product: Product(sequelize),
   Supplier: Supplier(sequelize),

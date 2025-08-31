@@ -27,7 +27,7 @@ const Shipper = (sequelize) => {
   });
 
   Shipper.associate = (models) => {
-    Shipper.hasMany(models.Order, {
+    Shipper.hasMany(models.SalesOrder, {
       foreignKey: 'shipperId',
       as: 'orders'
     });
