@@ -155,7 +155,7 @@ module.exports = (sequelize) => {
       as: 'subordinates'
     });
     
-    Employee.hasMany(models.Order, {
+    Employee.hasMany(models.SalesOrder, {
       foreignKey: 'employeeId',
       as: 'orders'
     });

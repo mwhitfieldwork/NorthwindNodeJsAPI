@@ -172,7 +172,7 @@ router.get('/', [
     const include = [];
     if (includeOrders) {
       include.push({
-        model: models.Order,
+        model: models.SalesOrder,
         as: 'orders',
         attributes: ['orderId', 'orderDate', 'shippedDate', 'freight'],
         include: [{
@@ -242,7 +242,7 @@ router.get('/:id', [
     const include = [];
     if (includeOrders) {
       include.push({
-        model: models.Order,
+        model: models.SalesOrder,
         as: 'orders',
         include: [
           {
@@ -431,7 +431,7 @@ router.delete('/:id', [
     const { id } = req.params;
     
     // Check if customer has orders
-    const orderCount = await models.Order.count({
+    const orderCount = await models.SalesOrder.count({
       where: { custId: id }
     });
     
