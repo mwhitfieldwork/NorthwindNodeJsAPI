@@ -517,56 +517,56 @@ router.get('/statistics', [
 
 /**
  * @swagger
- * /orders/{id}:
+ * /orders/customer/{customerId}:
  *   get:
- *     summary: Get order by ID
- *     tags: [Orders]
+ *     summary: Get all orders for a specific customer
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: customerId
  *         required: true
  *         schema:
  *           type: integer
+ *         description: ID of the customer
  *       - in: query
  *         name: includeCustomer
  *         schema:
  *           type: boolean
- *           default: false
+ *         description: Include customer details
  *       - in: query
  *         name: includeEmployee
  *         schema:
  *           type: boolean
- *           default: false
+ *         description: Include employee details
  *       - in: query
  *         name: includeShipper
  *         schema:
  *           type: boolean
- *           default: false
+ *         description: Include shipper details
  *       - in: query
  *         name: includeDetails
  *         schema:
  *           type: boolean
- *           default: true
+ *         description: Include order details and product/category info
  *     responses:
  *       200:
- *         description: Order details
+ *         description: List of orders for the customer
  *       404:
- *         description: Order not found
+ *         description: No orders found for the customer
  */
-router.get('/:id', [
-  param('id').isInt({ min: 1 }),
+router.get('/customer/:customerId', [
+  param('customerId').isInt({ min: 1 }),
   query('includeCustomer').optional().isBoolean(),
   query('includeEmployee').optional().isBoolean(),
   query('includeShipper').optional().isBoolean(),
   query('includeDetails').optional().isBoolean()
 ], handleValidationErrors, async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { customerId } = req.params;
     const includeCustomer = req.query.includeCustomer === 'true';
     const includeEmployee = req.query.includeEmployee === 'true';
     const includeShipper = req.query.includeShipper === 'true';
     const includeDetails = req.query.includeDetails !== 'false'; // Default true
-    
+
     const include = [];
     if (includeCustomer) {
       include.push({
@@ -601,22 +601,25 @@ router.get('/:id', [
         }]
       });
     }
-    
-    const order = await models.Order.findByPk(id, { include });
-    
-    if (!order) {
+
+    const orders = await models.Order.findAll({
+      where: { customerId },
+      include
+    });
+
+    if (!orders || orders.length === 0) {
       return res.status(404).json({
         success: false,
         error: {
-          message: 'Order not found',
+          message: 'No orders found for this customer',
           statusCode: 404
         }
       });
     }
-    
+
     res.json({
       success: true,
-      data: order
+      data: orders
     });
   } catch (error) {
     next(error);
