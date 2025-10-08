@@ -145,6 +145,7 @@ app.use(errorHandler);
 
 // Startup
 async function startServer() {
+  console.log('Server starting...');
   try {
     await sequelize.authenticate();
     console.log('✅ Database connection established.');
