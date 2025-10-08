@@ -7,12 +7,12 @@ const compression = require('compression');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
-// Import configurations and middleware
+// ⬇️ uses your existing Sequelize instance
 const { sequelize } = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const requestLogger = require('./middleware/requestLogger');
 
-// Import routes
+// Routes
 const categoryRoutes = require('./routes/categories');
 const customerRoutes = require('./routes/customers');
 const employeeRoutes = require('./routes/employees');
@@ -20,53 +20,45 @@ const orderRoutes = require('./routes/orders');
 const productRoutes = require('./routes/products');
 const supplierRoutes = require('./routes/suppliers');
 const loginRoutes = require('./routes/login');
-/*const shipperRoutes = require('./routes/shippers');
-const territoryRoutes = require('./routes/territories');
-const regionRoutes = require('./routes/regions');*/
 
 const app = express();
 const PORT = process.env.PORT || 3002;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
-
-// Security middleware
+// Security & perf
 app.use(helmet());
 app.use(compression());
 
-// CORS configuration
+// CORS
 const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:*').split(',');
-    
-    // Allow requests with no origin (mobile apps, postman, etc.)
     if (!origin) return callback(null, true);
-    
-    // Check for localhost with any port
-    if (allowedOrigins.some(allowed => 
-      allowed === '*' || 
-      origin === allowed || 
+    if (allowedOrigins.some(allowed =>
+      allowed === '*' ||
+      origin === allowed ||
       (allowed.includes('localhost:*') && origin.includes('localhost'))
     )) {
       return callback(null, true);
     }
-    
     callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true
 };
-
 app.use(cors(corsOptions));
 
-// Body parsing middleware
+// Body parsing & logging
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Logging middleware
 app.use(morgan('combined'));
 app.use(requestLogger);
 
-// Swagger configuration
+// Swagger (use a PUBLIC_BASE_URL when deployed so docs point to the live API)
+const API_BASE = process.env.API_BASE_URL || '/api/v1';
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
@@ -77,8 +69,8 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: `http://localhost:${PORT}${process.env.API_BASE_URL || '/api/v1'}`,
-        description: 'Development server',
+        url: `${PUBLIC_BASE_URL}${API_BASE}`,
+        description: NODE_ENV === 'production' ? 'Production server' : 'Development server',
       },
     ],
     components: {
@@ -86,15 +78,9 @@ const swaggerOptions = {
         Error: {
           type: 'object',
           properties: {
-            error: {
-              type: 'string',
-            },
-            message: {
-              type: 'string',
-            },
-            statusCode: {
-              type: 'integer',
-            }
+            error: { type: 'string' },
+            message: { type: 'string' },
+            statusCode: { type: 'integer' }
           }
         },
         PaginationInfo: {
@@ -115,35 +101,37 @@ const swaggerOptions = {
 const specs = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Simple liveness probe
+app.get('/health', (_req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: NODE_ENV
   });
 });
 
+// ✅ DB-backed readiness probe (this is “step 4” style)
+app.get('/ready', async (_req, res) => {
+  try {
+    // ping the DB using Sequelize
+    await sequelize.query('SELECT 1 AS ok');
+    res.json({ status: 'ready', db: true });
+  } catch (err) {
+    res.status(500).json({ status: 'error', db: false, error: err.message });
+  }
+});
+
 // API routes
-const apiBase = process.env.API_BASE_URL || '/api/v1';
+app.use(`${API_BASE}/categories`, categoryRoutes);
+app.use(`${API_BASE}/customers`, customerRoutes);
+app.use(`${API_BASE}/employees`, employeeRoutes);
+app.use(`${API_BASE}/orders`, orderRoutes);
+app.use(`${API_BASE}/products`, productRoutes);
+app.use(`${API_BASE}/suppliers`, supplierRoutes);
+app.use(`${API_BASE}/login`, loginRoutes);
 
-console.log('📍 API Base URL:', apiBase); 
-
-app.use(`${apiBase}/categories`, categoryRoutes);
-app.use(`${apiBase}/customers`, customerRoutes);
-app.use(`${apiBase}/employees`, employeeRoutes);
-app.use(`${apiBase}/orders`, orderRoutes);
-app.use(`${apiBase}/products`, productRoutes);
-app.use(`${apiBase}/suppliers`, supplierRoutes);
-app.use(`${apiBase}/login`, loginRoutes);
-/*app.use(`${apiBase}/shippers`, shipperRoutes);
-app.use(`${apiBase}/territories`, territoryRoutes);
-app.use(`${apiBase}/regions`, regionRoutes);*/
-
-console.log('✅ Login routes mounted at:', `${apiBase}/login`);
-
-// 404 handler
+// 404
 app.use('*', (req, res) => {
   res.status(404).json({
     error: 'Not Found',
@@ -155,47 +143,43 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use(errorHandler);
 
-// Database connection and server startup
+// Startup
 async function startServer() {
   console.log('Server starting...');
   try {
-    // Test database connection
     await sequelize.authenticate();
-    console.log('✅ Database connection established successfully.');
-    
-    // Sync database (in development only)
-    if (process.env.NODE_ENV === 'development') {
+    console.log('✅ Database connection established.');
+
+    if (NODE_ENV === 'development') {
       await sequelize.sync({ alter: false });
-      console.log('✅ Database synchronized successfully.');
+      console.log('✅ Database synchronized.');
     }
-    
-    // Start server
+
     app.listen(PORT, () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
-      console.log(`📖 API Documentation: http://localhost:${PORT}/api-docs`);
-      console.log(`❤️  Health Check: http://localhost:${PORT}/health`);
-      console.log(`🔗 API Base URL: http://localhost:${PORT}${apiBase}`);
+      console.log(`🚀 Server on :${PORT}`);
+      console.log(`📖 Swagger: ${PUBLIC_BASE_URL}/api-docs`);
+      console.log(`❤️ Health: ${PUBLIC_BASE_URL}/health`);
+      console.log(`🟢 Ready:  ${PUBLIC_BASE_URL}/ready`);
+      console.log(`🔗 Base:   ${PUBLIC_BASE_URL}${API_BASE}`);
     });
-    
+
   } catch (error) {
     console.error('❌ Unable to start server:', error);
     process.exit(1);
   }
 }
 
-// Handle unhandled promise rejections
+// Shutdown
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Promise Rejection:', err);
   process.exit(1);
 });
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
   process.exit(1);
 });
 
-// Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received. Shutting down gracefully...');
   await sequelize.close();
