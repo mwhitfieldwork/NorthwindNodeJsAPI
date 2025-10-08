@@ -27,6 +27,7 @@ const regionRoutes = require('./routes/regions');*/
 const app = express();
 const PORT = process.env.PORT || 3002;
 
+
 // Security middleware
 app.use(helmet());
 app.use(compression());
@@ -156,6 +157,7 @@ app.use(errorHandler);
 
 // Database connection and server startup
 async function startServer() {
+  console.log('Server starting...');
   try {
     // Test database connection
     await sequelize.authenticate();
