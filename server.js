@@ -101,6 +101,23 @@ const swaggerOptions = {
 const specs = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
+const allowedOrigins = [
+  'http://localhost:3002',
+  'https://northwindnodejsapi-production.up.railway.app'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
+
 // Simple liveness probe
 app.get('/health', (_req, res) => {
   res.json({
