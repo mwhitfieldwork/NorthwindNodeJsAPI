@@ -30,6 +30,7 @@ app.use(compression());
 
 // ✅ CORS (single, dynamic config)
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:4200').split(',');
+console.log('Allowed CORS Origins:', allowedOrigins);
 
 const corsOptions = {
   origin: function (origin, callback) {
