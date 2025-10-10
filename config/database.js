@@ -64,10 +64,12 @@ const baseOptions = {
   dialectOptions: {
     // character set preferences
     charset: 'utf8',
-    collate: 'utf8_general_ci',
+    //collate: 'utf8_general_ci',
     ...(sslWanted ? { ssl: { rejectUnauthorized: false } } : {}),
   },
 };
+
+console.log({ HOST, PORT, USER, PASSWORD, NAME });
 
 const sequelize = URL
   ? new Sequelize(URL, baseOptions)
