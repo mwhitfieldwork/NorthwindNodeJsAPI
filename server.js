@@ -7,7 +7,6 @@ const compression = require('compression');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
-// ⬇️ uses your existing Sequelize instance
 const { sequelize } = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const requestLogger = require('./middleware/requestLogger');
@@ -29,25 +28,28 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 app.use(helmet());
 app.use(compression());
 
-// CORS
+// ✅ CORS (single, dynamic config)
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:4200').split(',');
+
 const corsOptions = {
   origin: function (origin, callback) {
-    const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:*').split(',');
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.some(allowed =>
+    if (!origin || allowedOrigins.some(allowed =>
       allowed === '*' ||
       origin === allowed ||
-      (allowed.includes('localhost:*') && origin.includes('localhost'))
+      (allowed.includes('localhost') && origin.includes('localhost'))
     )) {
-      return callback(null, true);
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
-    callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true
 };
+
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // ✅ Preflight support
 
 // Body parsing & logging
 app.use(express.json({ limit: '10mb' }));
@@ -55,7 +57,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('combined'));
 app.use(requestLogger);
 
-// Swagger (use a PUBLIC_BASE_URL when deployed so docs point to the live API)
+// Swagger
 const API_BASE = process.env.API_BASE_URL || '/api/v1';
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
 
@@ -101,24 +103,7 @@ const swaggerOptions = {
 const specs = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
-const allowedOrigins = [
-  'http://localhost:3002',
-  'https://northwindnodejsapi-production.up.railway.app'
-];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
-
-
-// Simple liveness probe
+// Health checks
 app.get('/health', (_req, res) => {
   res.json({
     status: 'OK',
@@ -128,10 +113,8 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// ✅ DB-backed readiness probe (this is “step 4” style)
 app.get('/ready', async (_req, res) => {
   try {
-    // ping the DB using Sequelize
     await sequelize.query('SELECT 1 AS ok');
     res.json({ status: 'ready', db: true });
   } catch (err) {
