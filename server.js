@@ -24,6 +24,17 @@ const app = express();
 const PORT = process.env.PORT || 3002;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Security & perf
 app.use(helmet());
 app.use(compression());
@@ -34,13 +45,16 @@ console.log('Allowed CORS Origins:', allowedOrigins);
 
 const corsOptions = {
   origin: function (origin, callback) {
+    console.log('🛰️ CORS check for origin:', origin);
     if (!origin || allowedOrigins.some(allowed =>
       allowed === '*' ||
       origin === allowed ||
       (allowed.includes('localhost') && origin.includes('localhost'))
     )) {
+      console.log('✅ Origin allowed:', origin);
       callback(null, true);
     } else {
+      console.warn('❌ Origin blocked by CORS:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
